@@ -12,6 +12,7 @@
 
 #include "sensorNode.h"
 #include "Timer.h"
+#include "printf.h"
 
 
 // in the moment: reads fake sensor and broadcast every 30 seconds, ack message 
@@ -86,7 +87,7 @@ event void Read.readDone(error_t result, uint16_t data) {
 
 	dbg("radio","Radio on!\n");
 	dbg("role","I'm Sensor node %d: start sending periodical request\n", TOS_NODE_ID);
-	call MilliTimer.startPeriodic(SEND_PERIOD);	
+	call MilliTimer.startPeriodic(10000);	
     }
     else{
 	call SplitControl.start();
@@ -110,7 +111,7 @@ event void Read.readDone(error_t result, uint16_t data) {
 
 	if ( call PacketAcknowledgements.wasAcked( buf ) ) {
 	  dbg_clear("radio_ack", "and ack received");
-	  call MilliTimer.stop();
+	  //call MilliTimer.stop();
 	} else {
 	  dbg_clear("radio_ack", "but ack was not received");
 	  post sendData();

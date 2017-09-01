@@ -5,8 +5,6 @@
 #ifndef SENSOR_H
 #define SENSOR_H
 
-#define SEND_PERIOD 30000
-
 typedef nx_struct my_msg {
 	nx_uint16_t msg_id;
 	nx_uint16_t value;

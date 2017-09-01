@@ -6,6 +6,8 @@
  */
 
 #include "sensorNode.h"
+#define NEW_PRINTF_SEMANTICS
+#include "printf.h"
 
 configuration sensorNodeAppC {}
 
@@ -16,6 +18,8 @@ implementation {
   components ActiveMessageC;
   components new TimerMilliC();
   components new FakeSensorC();
+  //debug purpose only
+  components PrintfC;
 
   //Boot interface
   App.Boot -> MainC.Boot;

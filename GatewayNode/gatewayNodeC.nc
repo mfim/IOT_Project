@@ -43,6 +43,7 @@ module gatewayNodeC {
   //***************** Boot interface ********************//
   event void Boot.booted() {
 	dbg("boot","Application booted.\n");
+	call AMControl.start();	
 	call SplitControl.start();
   }
 
@@ -109,7 +110,6 @@ module gatewayNodeC {
 	dbg_clear("radio_rec", "\n ");
 	dbg_clear("radio_pack","\n");
 	
-	call AMControl.start();
 	post sendToNetwork();
 	
     return buf;
