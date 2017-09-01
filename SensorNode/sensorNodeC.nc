@@ -1,0 +1,118 @@
+/**
+ * PROJECT: LoraWAN-Like sensor Network
+ * 
+ * Source File for the implementation of sensor node in which
+ * the sensor node reads from the Fake Sensor (code previously available)
+ * and forwards a message to the gateway node, 
+ * the gateway node will then pass it to the network server node, and the ACK messages
+ * will be relayed back until reaches the sensor node
+ * 
+ *  @authors Matheus Fim and Caio Zuliani
+ */
+
+#include "sensorNode.h"
+#include "Timer.h"
+
+
+// in the moment: reads fake sensor and broadcast every 30 seconds, ack message 
+// to implement:  turn off radio when not transmiting, ack message time window should be 1 second
+
+module sensorNode {
+
+  uses {
+	interface Boot;
+    	interface AMPacket;
+	interface Packet;
+	interface PacketAcknowledgements;
+    	interface AMSend;
+    	interface SplitControl;
+    	interface Timer<TMilli> as MilliTimer;
+  }
+
+} implementation {
+
+  uint8_t counter=0;
+  uint8_t rec_id;
+  message_t packet;
+
+  task void sendReq();
+  task void sendResp();
+  
+  
+  //***************** Task send request ********************//
+  task void sendReq() {
+
+	my_msg_t* mess=(my_msg_t*)(call Packet.getPayload(&packet,sizeof(my_msg_t)));
+	mess->msg_id = counter++;
+	    
+	dbg("radio_send", "Try to broadcast a request to gateways at time %s \n", sim_time_string());
+    	
+	call PacketAcknowledgements.requestAck( &packet );
+
+	if(call AMSend.send(AM_BROADCAST_ADDR,&packet,sizeof(my_msg_t)) == SUCCESS){
+		
+	  dbg("radio_send", "Packet passed to lower layer successfully!\n");
+	  dbg("radio_pack",">>>Pack\n \t Payload length %hhu \n", call Packet.payloadLength( &packet ) );
+	  dbg_clear("radio_pack","\t Source: %hhu \n ", call AMPacket.source( &packet ) );
+	  dbg_clear("radio_pack","\t Destination: %hhu \n ", call AMPacket.destination( &packet ) );
+	  dbg_clear("radio_pack","\t AM Type: %hhu \n ", call AMPacket.type( &packet ) );
+	  dbg_clear("radio_pack","\t\t Payload \n" );
+	  dbg_clear("radio_pack", "\t\t msg_id: %hhu \n", mess->msg_id);
+	  dbg_clear("radio_pack", "\t\t value: %hhu \n", mess->value);
+	  dbg_clear("radio_send", "\n ");
+	  dbg_clear("radio_pack", "\n");
+      
+      }
+
+ }        
+
+  //***************** Boot interface ********************//
+  event void Boot.booted() {
+	dbg("boot","Application booted.\n");
+	call SplitControl.start();
+  }
+
+  //***************** SplitControl interface ********************//
+  event void SplitControl.startDone(error_t err){
+      
+    if(err == SUCCESS) {
+
+	dbg("radio","Radio on!\n");
+	dbg("role","I'm Sensor node %d: start sending periodical request\n", TOS_NODE_ID);
+	call MilliTimer.startPeriodic(SEND_PERIOD);	
+    }
+    else{
+	call SplitControl.start();
+    }
+
+  }
+  
+  event void SplitControl.stopDone(error_t err){}
+
+  //***************** MilliTimer interface ********************//
+  event void MilliTimer.fired() {
+	post sendReq();
+  }
+  
+
+  //********************* AMSend interface ****************//
+  event void AMSend.sendDone(message_t* buf,error_t err) {
+
+    if(&packet == buf && err == SUCCESS ) {
+	dbg("radio_send", "Packet sent...");
+
+	if ( call PacketAcknowledgements.wasAcked( buf ) ) {
+	  dbg_clear("radio_ack", "and ack received");
+	  call MilliTimer.stop();
+	} else {
+	  dbg_clear("radio_ack", "but ack was not received");
+	  post sendReq();
+	}
+	dbg_clear("radio_send", " at time %s \n", sim_time_string());
+    }
+	// turn off radio for another 30 seconds! battery....
+
+  }
+
+}
+
