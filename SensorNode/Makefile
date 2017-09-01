@@ -1,3 +1,3 @@
-COMPONENT=sendAckAppC
+COMPONENT=sensorNodeAppC
 include $(MAKERULES)
 

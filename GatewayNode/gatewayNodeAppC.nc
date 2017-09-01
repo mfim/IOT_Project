@@ -5,9 +5,9 @@
  *  @author Luca Pietro Borsani
  */
 
-#include "sensorNode.h"
+#include "gatewayNode.h"
 
-configuration sensorNodeAppC {}
+configuration gatewayNodeAppC {}
 
 implementation {
 
@@ -19,7 +19,6 @@ implementation {
 //  components new SerialAMReceiverC(AM_MY_MSG);
   components SerialActiveMessageC;
   components new TimerMilliC();
-  components new FakeSensorC();
 
   //Boot interface
   App.Boot -> MainC.Boot;
@@ -39,15 +38,12 @@ implementation {
   App.AMControl -> SerialActiveMessageC;
 
   //Interfaces to access package fields
-  App.AMPacket -> AMSenderC;
-  App.Packet -> AMSenderC;
-  App.PacketAcknowledgements->ActiveMessageC;
+  App.AMPacket -> SerialAMSenderC;
+  App.Packet -> SerialAMSenderC;
+  App.PacketAcknowledgements-> SerialActiveMessageC;
 
   //Timer interface
   App.MilliTimer -> TimerMilliC;
-
-  //Fake Sensor read
-  App.Read -> FakeSensorC;
 
 }
 

@@ -10,14 +10,14 @@
  *  @authors Matheus Fim and Caio Zuliani
  */
 
-#include "sensorNode.h"
-#include "Timer.h"
+#include "gatewayNode.h"
+//#include "Timer.h"
 
 
-// in the moment: 
-// to implement: 
+// in the moment: receives msg from radio, relay to serial 
+// to implement: check if it works, specially the change in the interfaces radio/serial
 
-module gatewayNode {
+module gatewayNodeC {
 
   uses {
 	interface Boot;
@@ -30,7 +30,7 @@ module gatewayNode {
 	interface SplitControl as AMControl;
     	interface Receive;
     	interface Timer<TMilli> as MilliTimer;
-	interface Read<uint16_t>;
+	
   }
 
 } implementation {
@@ -38,15 +38,7 @@ module gatewayNode {
   uint8_t rec_id;
   message_t packet;
 
-  task void sendReq();
-  task void sendResp();
-  
-  
-  //****************** Task send response *****************//
-  
- task void sendResp() {
-	call Read.read();
-  }
+  task void sendToNetwork();
 
   //***************** Boot interface ********************//
   event void Boot.booted() {
@@ -91,12 +83,12 @@ module gatewayNode {
 
 
   //***************** MilliTimer interface ********************//
-/* 
+ 
  event void MilliTimer.fired() {
-	post sendReq();
+	post sendToNetwork();
   }
   
-*/
+
 
   //***************************** Receive interface *****************//
 
@@ -118,21 +110,20 @@ module gatewayNode {
 	dbg_clear("radio_pack","\n");
 	
 	call AMControl.start();
-	post sendResp();
+	post sendToNetwork();
 	
     return buf;
 
   }
- 
+
 
   //************************* Read interface **********************//
 
 
-  event void Read.readDone(error_t result, uint16_t data) {
+  task void sendToNetwork() {
 
 	my_msg_t* mess=(my_msg_t*)(call Packet.getPayload(&packet,sizeof(my_msg_t)));
 	mess->msg_id = rec_id;
-	mess->value = data;
 	  
 	dbg("serial_send", "Try to relay message to network server node at time %s \n", sim_time_string());
 	call PacketAcknowledgements.requestAck( &packet );
@@ -150,6 +141,25 @@ module gatewayNode {
 	  dbg_clear("serial_pack", "\n");
 
         }
+
+  }
+
+//********************* AMSend interface ****************//
+  event void AMSend.sendDone(message_t* buf,error_t err) {
+
+    if(&packet == buf && err == SUCCESS ) {
+	dbg("serial_send", "Packet sent...");
+
+	if ( call PacketAcknowledgements.wasAcked( buf ) ) {
+	  dbg_clear("serial_ack", "and ack received");
+	  call MilliTimer.stop();
+	} else {
+	  dbg_clear("serial_ack", "but ack was not received");
+	  post sendToNetwork();
+	}
+	dbg_clear("serial_send", " at time %s \n", sim_time_string());
+    }
+	// turn off radio for another 30 seconds! battery....
 
   }
 

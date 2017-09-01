@@ -17,7 +17,7 @@
 // in the moment: reads fake sensor and broadcast every 30 seconds, ack message 
 // to implement:  turn off radio when not transmiting, ack message time window should be 1 second
 
-module sensorNode {
+module sensorNodeC {
 
   uses {
 	interface Boot;
@@ -27,6 +27,7 @@ module sensorNode {
     	interface AMSend;
     	interface SplitControl;
     	interface Timer<TMilli> as MilliTimer;
+	interface Read<uint16_t>;
   }
 
 } implementation {
@@ -35,16 +36,22 @@ module sensorNode {
   uint8_t rec_id;
   message_t packet;
 
-  task void sendReq();
-  task void sendResp();
+  task void sendData();
+
+  //****************** Task send response *****************//
   
-  
-  //***************** Task send request ********************//
-  task void sendReq() {
+ task void sendData() {
+	call Read.read();
+  }
+
+//************************* Read interface **********************//
+   
+event void Read.readDone(error_t result, uint16_t data) {
 
 	my_msg_t* mess=(my_msg_t*)(call Packet.getPayload(&packet,sizeof(my_msg_t)));
 	mess->msg_id = counter++;
-	    
+	mess->value = data;	
+    
 	dbg("radio_send", "Try to broadcast a request to gateways at time %s \n", sim_time_string());
     	
 	call PacketAcknowledgements.requestAck( &packet );
@@ -91,7 +98,7 @@ module sensorNode {
 
   //***************** MilliTimer interface ********************//
   event void MilliTimer.fired() {
-	post sendReq();
+	post sendData();
   }
   
 
@@ -106,7 +113,7 @@ module sensorNode {
 	  call MilliTimer.stop();
 	} else {
 	  dbg_clear("radio_ack", "but ack was not received");
-	  post sendReq();
+	  post sendData();
 	}
 	dbg_clear("radio_send", " at time %s \n", sim_time_string());
     }
