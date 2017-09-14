@@ -1,4 +1,4 @@
-COMPONENT=gatewayNodeAppC
+COMPONENT=TestSerialAppC
 BUILD_EXTRA_DEPS += TestSerial.class
 CLEAN_EXTRA = *.class TestSerialMsg.java
 

@@ -1,0 +1,23 @@
+#include "gatewayNode.h"
+
+configuration TestSerialAppC {}
+
+implementation {
+
+  components MainC, TestSerialC as App;
+  components SerialActiveMessageC as AM;
+  components new TimerMilliC();
+
+  //Boot interface
+  App.Boot -> MainC.Boot;
+
+  //Send Serial interfaces
+  App.AMSend -> AM.AMSend[AM_MY_MSG];
+  App.Control -> AM;
+  App.Packet -> AM;
+  
+  //Timer interface
+  App.MilliTimer -> TimerMilliC;
+
+}
+

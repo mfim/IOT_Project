@@ -21,14 +21,21 @@ module gatewayNodeC {
 
   uses {
 	interface Boot;
-    	interface AMPacket;
-	interface Packet;
+	interface SplitControl as SerialControl;
+        interface SplitControl as RadioControl;
+
+    	interface AMSend as UartSend;
+// 	interface Receive as UartReceive[am_id_t id];
+    	interface Packet as UartPacket;
+	interface AMPacket as UartAMPacket;
+
+//	interface AMSend as RadioSend[am_id_t id];
+	interface Receive as RadioReceive;
+//	interface Receive as RadioSnoop[AM_MY:_MSG];
+	interface Packet as RadioPacket;
+	interface AMPacket as RadioAMPacket;
+
 	interface PacketAcknowledgements;
-    	interface AMSend;
-    	interface SplitControl;
-	// added later 
-	interface SplitControl as AMControl;
-    	interface Receive;
     	interface Timer<TMilli> as MilliTimer;
 	
   }
@@ -38,17 +45,19 @@ module gatewayNodeC {
   uint8_t rec_id;
   message_t packet;
 
-  task void sendToNetwork();
+  task void sendToUart();
+  bool       uartBusy;
 
   //***************** Boot interface ********************//
   event void Boot.booted() {
 	dbg("boot","Application booted.\n");
-	call AMControl.start();	
-	call SplitControl.start();
+	uartBusy = FALSE;
+	call RadioControl.start();	
+	call SerialControl.start();
   }
 
-  //***************** SplitControl interface ********************//
-  event void SplitControl.startDone(error_t err){
+  //***************** RadioControl interface ********************//
+  event void RadioControl.startDone(error_t err){
       
     if(err == SUCCESS) {
 
@@ -56,16 +65,16 @@ module gatewayNodeC {
 	dbg("role","I'm Gateway node %d: start receiving requests\n", TOS_NODE_ID);
     }
     else{
-	call SplitControl.start();
+	call RadioControl.start();
     }
 
   }
   
-  event void SplitControl.stopDone(error_t err){}
+  event void RadioControl.stopDone(error_t err){}
 
 
-//***************** AMControl interface ********************//
-  event void AMControl.startDone(error_t err){
+//***************** SerialControl interface ********************//
+  event void SerialControl.startDone(error_t err){
       
     if(err == SUCCESS) {
 
@@ -73,45 +82,48 @@ module gatewayNodeC {
 	dbg("role","I'm Gateway node %d: preparing to send request through serial port\n", TOS_NODE_ID);
     }
     else{
-	call AMControl.start();
+	call SerialControl.start();
     }
 
   }
   
-  event void AMControl.stopDone(error_t err){}
+  event void SerialControl.stopDone(error_t err){}
 
 
 
 
   //***************** MilliTimer interface ********************//
- 
+ // change to be the ack!!!! not now.....
  event void MilliTimer.fired() {
-	post sendToNetwork();
+	post sendToUart();
   }
   
 
 
-  //***************************** Receive interface *****************//
+  //***************************** Radio Receive interface *****************//
 
 
-  event message_t* Receive.receive(message_t* buf,void* payload, uint8_t len) {
+  event message_t* RadioReceive.receive(message_t* buf,void* payload, uint8_t len) {
 
 	my_msg_t* mess=(my_msg_t*)payload;
 	rec_id = mess->msg_id;
 	
 	dbg("radio_rec","Message received at time %s \n", sim_time_string());
-	dbg("radio_pack",">>>Pack \n \t Payload length %hhu \n", call Packet.payloadLength( buf ) );
-	dbg_clear("radio_pack","\t Source: %hhu \n", call AMPacket.source( buf ) );
-	dbg_clear("radio_pack","\t Destination: %hhu \n", call AMPacket.destination( buf ) );
-	dbg_clear("radio_pack","\t AM Type: %hhu \n", call AMPacket.type( buf ) );
+	dbg("radio_pack",">>>Pack \n \t Payload length %hhu \n", call RadioPacket.payloadLength( buf ) );
+	dbg_clear("radio_pack","\t Source: %hhu \n", call RadioAMPacket.source( buf ) );
+	dbg_clear("radio_pack","\t Destination: %hhu \n", call RadioAMPacket.destination( buf ) );
+	dbg_clear("radio_pack","\t AM Type: %hhu \n", call RadioAMPacket.type( buf ) );
 	dbg_clear("radio_pack","\t\t Payload \n" );
 	dbg_clear("radio_pack", "\t\t msg_id: %hhu \n", mess->msg_id);
 	dbg_clear("radio_pack", "\t\t value: %hhu \n", mess->value);
 	dbg_clear("radio_rec", "\n ");
 	dbg_clear("radio_pack","\n");
 	
-	post sendToNetwork();
-	
+	//post sendACK();
+	if(!uartBusy){
+	  post sendToUart();
+	  uartBusy= TRUE;
+	}
     return buf;
 
   }
@@ -120,47 +132,39 @@ module gatewayNodeC {
   //************************* Read interface **********************//
 
 
-  task void sendToNetwork() {
-
-	my_msg_t* mess=(my_msg_t*)(call Packet.getPayload(&packet,sizeof(my_msg_t)));
+  task void sendToUart() {
+	
+	my_msg_t* mess=(my_msg_t*)(call RadioPacket.getPayload(&packet,sizeof(my_msg_t)));
 	mess->msg_id = rec_id;
-	  
-	dbg("serial_send", "Try to relay message to network server node at time %s \n", sim_time_string());
-	call PacketAcknowledgements.requestAck( &packet );
-	if(call AMSend.send(AM_BROADCAST_ADDR,&packet,sizeof(my_msg_t)) == SUCCESS){
 		
-	  dbg("serial_send", "Packet passed to lower layer successfully!\n");
-	  dbg("serial_pack",">>>Pack\n \t Payload length %hhu \n", call Packet.payloadLength( &packet ) );
-	  dbg_clear("serial_pack","\t Source: %hhu \n ", call AMPacket.source( &packet ) );
-	  dbg_clear("serial_pack","\t Destination: %hhu \n ", call AMPacket.destination( &packet ) );
-	  dbg_clear("serial_pack","\t AM Type: %hhu \n ", call AMPacket.type( &packet ) );
-	  dbg_clear("serial_pack","\t\t Payload \n" );
-	  dbg_clear("serial_pack", "\t\t msg_id: %hhu \n", mess->msg_id);
-	  dbg_clear("serial_pack", "\t\t value: %hhu \n", mess->value);
-	  dbg_clear("serial_send", "\n ");
-	  dbg_clear("serial_pack", "\n");
-
+	dbg("serial_send", "Try to relay message to network server node at time %s \n", sim_time_string());
+	  
+	//call PacketAcknowledgements.requestAck( &packet );
+	if(call UartSend.send(AM_BROADCAST_ADDR,&packet,sizeof(my_msg_t)) == SUCCESS){
+		dbg("serial_send", "Packet passed to lower layer successfully!\n");
+		dbg("serial_pack",">>>Pack\n \t Payload length %hhu \n", call UartPacket.payloadLength( &packet ) );
+		dbg_clear("serial_pack","\t Source: %hhu \n ", call UartAMPacket.source( &packet ) );
+		dbg_clear("serial_pack","\t Destination: %hhu \n ", call UartAMPacket.destination( &packet ) );
+		dbg_clear("serial_pack","\t AM Type: %hhu \n ", call UartAMPacket.type( &packet ) );
+		dbg_clear("serial_pack","\t\t Payload \n" );
+		dbg_clear("serial_pack", "\t\t msg_id: %hhu \n", mess->msg_id);
+		dbg_clear("serial_pack", "\t\t value: %hhu \n", mess->value);
+		dbg_clear("serial_send", "\n ");
+		dbg_clear("serial_pack", "\n");
         }
 
   }
 
-//********************* AMSend interface ****************//
-  event void AMSend.sendDone(message_t* buf,error_t err) {
+//********************* UartSend interface ****************//
+  event void UartSend.sendDone(message_t* buf,error_t err) {
 
     if(&packet == buf && err == SUCCESS ) {
+	uartBusy = FALSE;
 	dbg("serial_send", "Packet sent...");
 
-	if ( call PacketAcknowledgements.wasAcked( buf ) ) {
-	  dbg_clear("serial_ack", "and ack received");
-	  call MilliTimer.stop();
-	} else {
-	  dbg_clear("serial_ack", "but ack was not received");
-	  post sendToNetwork();
-	}
 	dbg_clear("serial_send", " at time %s \n", sim_time_string());
     }
-	// turn off radio for another 30 seconds! battery....
-
+	
   }
 
 }
