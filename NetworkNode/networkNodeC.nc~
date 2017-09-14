@@ -1,8 +1,8 @@
 /**
  * PROJECT: LoraWAN-Like sensor Network
  * 
- * Source File for the implementation of gateway node in which
- * the gateway node receives through the radio from sensor nodes
+ * Source File for the implementation of networkNode in which
+ * the networkNode receives through the radio from sensor nodes
  * and forwards a message to the network server node through the serialForwarder,(??? check if it works right!) 
  * it will the wait for the ack from network server and relay it to the  
  * right sensor node. 
@@ -10,14 +10,14 @@
  *  @authors Matheus Fim and Caio Zuliani
  */
 
-#include "gatewayNode.h"
+#include "networkNode.h"
 //#include "Timer.h"
 
 
 // in the moment: receives msg from radio, relay to serial 
 // to implement: check if it works, specially the change in the interfaces radio/serial
 
-module gatewayNodeC {
+module networkNodeC {
 
   uses {
 	interface Boot;
