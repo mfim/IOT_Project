@@ -10,8 +10,9 @@
  *  @authors Matheus Fim and Caio Zuliani
  */
 
-#include "sensorNode.h"
+#include "../LoraLikeConfig.h"
 #include "Timer.h"
+#include "printf.h"
 
 
 // in the moment: reads fake sensor and broadcast every 30 seconds, ack message 
@@ -24,8 +25,10 @@ module sensorNodeC {
     	interface AMPacket;
 	interface Packet;
     	interface AMSend;
+	interface Receive;
     	interface SplitControl;
     	interface Timer<TMilli> as MilliTimer;
+	interface Timer<TMilli> as AckTimer;
 	interface Read<uint16_t>;
   }
 
@@ -33,12 +36,25 @@ module sensorNodeC {
 
   uint8_t counter=0;
   uint8_t rec_id;
+  uint16_t sender;
+  uint16_t new_value;
   message_t packet;
+  
 
   task void sendData();
+  task void reSendData();
 
-  //****************** Task send response *****************//
-  
+   task void reSendData() {
+        
+	my_msg_t* mess=(my_msg_t*)(call Packet.getPayload(&packet,sizeof(my_msg_t)));
+		
+	mess->msg_id = rec_id;
+	mess->value = new_value;
+	mess->sender = sender;
+
+	call AMSend.send(AM_BROADCAST_ADDR, &packet, sizeof(my_msg_t));
+  }
+  //****************** Task send response *****************// 
  task void sendData() {
 	call Read.read();
   }
@@ -51,6 +67,10 @@ event void Read.readDone(error_t result, uint16_t data) {
 	mess->msg_id = counter++;
 	mess->value = data;
 	mess->sender = TOS_NODE_ID;	
+
+	rec_id = mess->msg_id;
+	new_value = mess->value;
+	sender = mess->sender;
        	
 	call AMSend.send(AM_BROADCAST_ADDR,&packet,sizeof(my_msg_t));
 
@@ -81,15 +101,38 @@ event void Read.readDone(error_t result, uint16_t data) {
   }
   
 
+  //***************** AckTimer interface ********************//
+  event void AckTimer.fired() {
+	post reSendData();
+  }
+
   //********************* AMSend interface ****************//
   event void AMSend.sendDone(message_t* buf,error_t err) {
 
     if(&packet == buf && err == SUCCESS ) {
-	return; // write function!	
+	call AckTimer.startOneShot(1000);	
     }
-	// turn off radio for another 30 seconds! battery....
+    else{
+        post sendData();
+    }
+  }
 
+ //********************* Receive ACK interface ****************//
+  event message_t* Receive.receive(message_t* msg, void* payload, uint8_t len){
+        
+      my_ack_t *ack = (my_ack_t *) payload;      
+      
+     // printf("ACK->CODE : %u\n", ack->code);
+      //printfflush();    
+
+      if(ack->code == sender + new_value + rec_id){ 		
+	call AckTimer.stop(); 
+      }	
+ 
+      return msg;
   }
 
 }
+
+
 

@@ -4,8 +4,9 @@
  *
  *  @author Luca Pietro Borsani
  */
-
-#include "sensorNode.h"
+#define NEW_PRINTF_SEMANTICS
+#include "../LoraLikeConfig.h"
+#include "printf.h"
 
 configuration sensorNodeAppC {}
 
@@ -14,7 +15,10 @@ implementation {
   components MainC, sensorNodeC as App;
   components new AMSenderC(AM_MY_MSG);
   components ActiveMessageC;
-  components new TimerMilliC();
+  components new TimerMilliC() as Timer0;
+  components new TimerMilliC() as Timer1; 
+  components PrintfC;
+  components SerialStartC;
   components new FakeSensorC();
   
   //Boot interface
@@ -22,6 +26,8 @@ implementation {
 
   //Send and Receive interfaces
   App.AMSend -> AMSenderC;
+  App.Receive -> ActiveMessageC.Receive[AM_MY_ACK];
+
 
   //Radio Control
   App.SplitControl -> ActiveMessageC;
@@ -31,7 +37,8 @@ implementation {
   App.Packet -> AMSenderC;
 
   //Timer interface
-  App.MilliTimer -> TimerMilliC;
+  App.MilliTimer -> Timer0;
+  App.AckTimer -> Timer1;  
 
   //Fake Sensor read
   App.Read -> FakeSensorC;

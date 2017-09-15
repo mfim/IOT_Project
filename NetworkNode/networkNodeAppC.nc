@@ -3,8 +3,9 @@
  *  components needed for proper functioning
  *
  */
-
-#include "networkNode.h"
+#define NEW_PRINTF_SEMANTICS
+#include "../LoraLikeConfig.h"
+#include "printf.h"
 
 configuration networkNodeAppC {}
 
@@ -14,15 +15,11 @@ implementation {
   components ActiveMessageC as Radio;
   components SerialActiveMessageC as Serial;
   components new TimerMilliC();
+  components PrintfC;
+  components SerialStartC;
 
   //Boot interface
   App.Boot -> MainC.Boot;
-
-  //Receive Radio interfaces
- // App.Receive -> Radio.AMReceiverC[AM_MY_MSG];
-
-  //Send Serial interfaces
-//  App.AMSend -> Serial.AMSendC[AM_MY_MSG];
 
   //Control
   App.RadioControl -> Radio;
@@ -35,7 +32,7 @@ implementation {
   App.UartAMPacket -> Serial;
 
   //Radio
-//  App.RadioSend -> Radio;
+  App.RadioSend -> Radio.AMSend[AM_MY_ACK];
   App.RadioReceive -> Radio.Receive[AM_MY_MSG];
 //  App.RadioSnoop -> Radio.Snoop;
   App.RadioPacket -> Radio;

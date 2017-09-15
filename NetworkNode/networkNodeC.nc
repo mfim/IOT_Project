@@ -10,12 +10,8 @@
  *  @authors Matheus Fim and Caio Zuliani
  */
 
-#include "networkNode.h"
-//#include "Timer.h"
-
-
-// in the moment: receives msg from radio, relay to serial 
-// to implement: check if it works, specially the change in the interfaces radio/serial
+#include "../LoraLikeConfig.h"
+#include "printf.h"
 
 module networkNodeC {
 
@@ -29,7 +25,7 @@ module networkNodeC {
     	interface Packet as UartPacket;
 	interface AMPacket as UartAMPacket;
 
-//	interface AMSend as RadioSend[am_id_t id];
+	interface AMSend as RadioSend;
 	interface Receive as RadioReceive;
 //	interface Receive as RadioSnoop[AM_MY:_MSG];
 	interface Packet as RadioPacket;
@@ -46,10 +42,12 @@ module networkNodeC {
   uint16_t new_value;
   uint16_t sender;
   message_t packet;
+  message_t ackPacket;
   my_msg_t not_again[6];
   uint8_t index=-1;
 
   task void sendToUart();
+ 
   bool       uartBusy;
 
   //***************** Boot interface ********************//
@@ -93,26 +91,37 @@ module networkNodeC {
 
   //***************************** Radio Receive interface *****************//
 
-
   event message_t* RadioReceive.receive(message_t* buf,void* payload, uint8_t len) {
 
 	my_msg_t* mess=(my_msg_t*)payload;
-	
+
+	my_ack_t* ack=(my_ack_t*)(call RadioPacket.getPayload(&ackPacket, sizeof (my_ack_t)));
+        
 	uint8_t i;
 	for(i = 0; i < CAPACITY; i++){
 		if((not_again[i].msg_id == mess->msg_id) && (not_again[i].sender == mess->sender)){
-			//send ack as well!
 			return buf;
 		}
 	}
-
+		
 	index = (index + 1) % CAPACITY;
 	
 	not_again[index].msg_id = mess->msg_id;
 	not_again[index].value = mess->value;
         not_again[index].sender = mess->sender;  
-
 	
+	//printf("Not Again: Id: %u Value: %u Sender: %u\n", not_again[index].msg_id, not_again[index].value, not_again[index].sender);	
+
+	//printfflush();	
+
+	ack->code = not_again[index].sender + not_again[index].value + not_again[index].msg_id;
+	
+	//printf("THE SENDER IS.... %u\n", call RadioAMPacket.source( &packet ));
+	//printfflush();	
+
+        // OK CHANGE THIS!!!!!!! NOT BROADCAST; BUT TO RIGHT NODE!
+	call RadioSend.send(AM_BROADCAST_ADDR, &ackPacket, sizeof(my_ack_t));
+        
 	//post sendACK();
 	if(!uartBusy){
 	  post sendToUart();
@@ -122,9 +131,11 @@ module networkNodeC {
 
   }
 
+  //********************* RadioSend interface ****************//
+  event void RadioSend.sendDone(message_t* buf,error_t err) {}
+
 
   //************************* Read interface **********************//
-
 
   task void sendToUart() {
 	
