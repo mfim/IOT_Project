@@ -43,14 +43,17 @@ module networkNodeC {
 } implementation {
 
   uint8_t rec_id;
+  uint16_t new_value;
+  uint16_t sender;
   message_t packet;
+  my_msg_t not_again[6];
+  uint8_t index=-1;
 
   task void sendToUart();
   bool       uartBusy;
 
   //***************** Boot interface ********************//
   event void Boot.booted() {
-	dbg("boot","Application booted.\n");
 	uartBusy = FALSE;
 	call RadioControl.start();	
 	call SerialControl.start();
@@ -59,12 +62,7 @@ module networkNodeC {
   //***************** RadioControl interface ********************//
   event void RadioControl.startDone(error_t err){
       
-    if(err == SUCCESS) {
-
-	dbg("radio","Radio on!\n");
-	dbg("role","I'm Network node %d: start receiving requests\n", TOS_NODE_ID);
-    }
-    else{
+    if(err != SUCCESS) {
 	call RadioControl.start();
     }
 
@@ -76,20 +74,13 @@ module networkNodeC {
 //***************** SerialControl interface ********************//
   event void SerialControl.startDone(error_t err){
       
-    if(err == SUCCESS) {
-
-	dbg("serial","Serial on!\n");
-	dbg("role","I'm Newtork node %d: preparing to send request through serial port\n", TOS_NODE_ID);
-    }
-    else{
+    if(err != SUCCESS) {
 	call SerialControl.start();
     }
 
   }
   
   event void SerialControl.stopDone(error_t err){}
-
-
 
 
   //***************** MilliTimer interface ********************//
@@ -106,18 +97,21 @@ module networkNodeC {
   event message_t* RadioReceive.receive(message_t* buf,void* payload, uint8_t len) {
 
 	my_msg_t* mess=(my_msg_t*)payload;
-	rec_id = mess->msg_id;
 	
-	dbg("radio_rec","Message received at time %s \n", sim_time_string());
-	dbg("radio_pack",">>>Pack \n \t Payload length %hhu \n", call RadioPacket.payloadLength( buf ) );
-	dbg_clear("radio_pack","\t Source: %hhu \n", call RadioAMPacket.source( buf ) );
-	dbg_clear("radio_pack","\t Destination: %hhu \n", call RadioAMPacket.destination( buf ) );
-	dbg_clear("radio_pack","\t AM Type: %hhu \n", call RadioAMPacket.type( buf ) );
-	dbg_clear("radio_pack","\t\t Payload \n" );
-	dbg_clear("radio_pack", "\t\t msg_id: %hhu \n", mess->msg_id);
-	dbg_clear("radio_pack", "\t\t value: %hhu \n", mess->value);
-	dbg_clear("radio_rec", "\n ");
-	dbg_clear("radio_pack","\n");
+	uint8_t i;
+	for(i = 0; i < CAPACITY; i++){
+		if((not_again[i].msg_id == mess->msg_id) && (not_again[i].sender == mess->sender)){
+			//send ack as well!
+			return buf;
+		}
+	}
+
+	index = (index + 1) % CAPACITY;
+	
+	not_again[index].msg_id = mess->msg_id;
+	not_again[index].value = mess->value;
+        not_again[index].sender = mess->sender;  
+
 	
 	//post sendACK();
 	if(!uartBusy){
@@ -135,23 +129,12 @@ module networkNodeC {
   task void sendToUart() {
 	
 	my_msg_t* mess=(my_msg_t*)(call RadioPacket.getPayload(&packet,sizeof(my_msg_t)));
-	mess->msg_id = rec_id;
-		
-	dbg("serial_send", "Try to relay message to network server node at time %s \n", sim_time_string());
-	  
+	mess->msg_id = not_again[index].msg_id;
+	mess->value = not_again[index].value;
+	mess->sender = not_again[index].sender;
+		  
 	//call PacketAcknowledgements.requestAck( &packet );
-	if(call UartSend.send(AM_BROADCAST_ADDR,&packet,sizeof(my_msg_t)) == SUCCESS){
-		dbg("serial_send", "Packet passed to lower layer successfully!\n");
-		dbg("serial_pack",">>>Pack\n \t Payload length %hhu \n", call UartPacket.payloadLength( &packet ) );
-		dbg_clear("serial_pack","\t Source: %hhu \n ", call UartAMPacket.source( &packet ) );
-		dbg_clear("serial_pack","\t Destination: %hhu \n ", call UartAMPacket.destination( &packet ) );
-		dbg_clear("serial_pack","\t AM Type: %hhu \n ", call UartAMPacket.type( &packet ) );
-		dbg_clear("serial_pack","\t\t Payload \n" );
-		dbg_clear("serial_pack", "\t\t msg_id: %hhu \n", mess->msg_id);
-		dbg_clear("serial_pack", "\t\t value: %hhu \n", mess->value);
-		dbg_clear("serial_send", "\n ");
-		dbg_clear("serial_pack", "\n");
-        }
+	call UartSend.send(AM_BROADCAST_ADDR,&packet,sizeof(my_msg_t));
 
   }
 
@@ -160,9 +143,6 @@ module networkNodeC {
 
     if(&packet == buf && err == SUCCESS ) {
 	uartBusy = FALSE;
-	dbg("serial_send", "Packet sent...");
-
-	dbg_clear("serial_send", " at time %s \n", sim_time_string());
     }
 	
   }

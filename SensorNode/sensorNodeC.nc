@@ -23,7 +23,6 @@ module sensorNodeC {
 	interface Boot;
     	interface AMPacket;
 	interface Packet;
-	interface PacketAcknowledgements;
     	interface AMSend;
     	interface SplitControl;
     	interface Timer<TMilli> as MilliTimer;
@@ -50,32 +49,15 @@ event void Read.readDone(error_t result, uint16_t data) {
 
 	my_msg_t* mess=(my_msg_t*)(call Packet.getPayload(&packet,sizeof(my_msg_t)));
 	mess->msg_id = counter++;
-	mess->value = data;	
-    
-	dbg("radio_send", "Try to broadcast a request to gateways at time %s \n", sim_time_string());
-    	
-	call PacketAcknowledgements.requestAck( &packet );
-
-	if(call AMSend.send(AM_BROADCAST_ADDR,&packet,sizeof(my_msg_t)) == SUCCESS){
-		
-	  dbg("radio_send", "Packet passed to lower layer successfully!\n");
-	  dbg("radio_pack",">>>Pack\n \t Payload length %hhu \n", call Packet.payloadLength( &packet ) );
-	  dbg_clear("radio_pack","\t Source: %hhu \n ", call AMPacket.source( &packet ) );
-	  dbg_clear("radio_pack","\t Destination: %hhu \n ", call AMPacket.destination( &packet ) );
-	  dbg_clear("radio_pack","\t AM Type: %hhu \n ", call AMPacket.type( &packet ) );
-	  dbg_clear("radio_pack","\t\t Payload \n" );
-	  dbg_clear("radio_pack", "\t\t msg_id: %hhu \n", mess->msg_id);
-	  dbg_clear("radio_pack", "\t\t value: %hhu \n", mess->value);
-	  dbg_clear("radio_send", "\n ");
-	  dbg_clear("radio_pack", "\n");
-      
-      }
+	mess->value = data;
+	mess->sender = TOS_NODE_ID;	
+       	
+	call AMSend.send(AM_BROADCAST_ADDR,&packet,sizeof(my_msg_t));
 
  }        
 
   //***************** Boot interface ********************//
   event void Boot.booted() {
-	dbg("boot","Application booted.\n");
 	call SplitControl.start();
   }
 
@@ -83,10 +65,7 @@ event void Read.readDone(error_t result, uint16_t data) {
   event void SplitControl.startDone(error_t err){
       
     if(err == SUCCESS) {
-
-	dbg("radio","Radio on!\n");
-	dbg("role","I'm Sensor node %d: start sending periodical request\n", TOS_NODE_ID);
-	call MilliTimer.startPeriodic(10000);	
+	call MilliTimer.startPeriodic(30000);	
     }
     else{
 	call SplitControl.start();
@@ -106,16 +85,7 @@ event void Read.readDone(error_t result, uint16_t data) {
   event void AMSend.sendDone(message_t* buf,error_t err) {
 
     if(&packet == buf && err == SUCCESS ) {
-	dbg("radio_send", "Packet sent...");
-
-	if ( call PacketAcknowledgements.wasAcked( buf ) ) {
-	  dbg_clear("radio_ack", "and ack received");
-	  //call MilliTimer.stop();
-	} else {
-	  dbg_clear("radio_ack", "but ack was not received");
-	  post sendData();
-	}
-	dbg_clear("radio_send", " at time %s \n", sim_time_string());
+	return; // write function!	
     }
 	// turn off radio for another 30 seconds! battery....
 

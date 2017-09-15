@@ -2,8 +2,8 @@
  *  based on work of @author Luca Pietro Borsani
  */
 
-#ifndef SENSOR_H
-#define SENSOR_H
+#ifndef GATEWAY_H
+#define GATEWAY_H
 
 typedef nx_struct my_msg {
 	nx_uint16_t msg_id;
