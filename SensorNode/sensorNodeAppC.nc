@@ -1,8 +1,8 @@
 /**
- *  Configuration file for wiring of sendAckC module to other common 
+ *  Configuration file for wiring of Sensor Node module to other common 
  *  components needed for proper functioning
  *
- *  @author Luca Pietro Borsani
+ *  @author Matheus Fim and Caio Zuliani 
  */
 #define NEW_PRINTF_SEMANTICS
 #include "../LoraLikeConfig.h"
@@ -27,7 +27,6 @@ implementation {
   //Send and Receive interfaces
   App.AMSend -> AMSenderC;
   App.Receive -> ActiveMessageC.Receive[AM_MY_ACK];
-
 
   //Radio Control
   App.SplitControl -> ActiveMessageC;

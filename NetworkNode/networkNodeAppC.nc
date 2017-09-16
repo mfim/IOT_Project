@@ -27,14 +27,12 @@ implementation {
   
   //Serial
   App.UartSend -> Serial.AMSend[AM_MY_MSG];
-//  App.UartReceive -> Serial.Receive;
   App.UartPacket -> Serial;
   App.UartAMPacket -> Serial;
 
   //Radio
   App.RadioSend -> Radio.AMSend[AM_MY_ACK];
   App.RadioReceive -> Radio.Receive[AM_MY_MSG];
-//  App.RadioSnoop -> Radio.Snoop;
   App.RadioPacket -> Radio;
   App.RadioAMPacket -> Radio;
 

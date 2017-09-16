@@ -2,10 +2,9 @@
  * PROJECT: LoraWAN-Like sensor Network
  * 
  * Source File for the implementation of networkNode in which
- * the networkNode receives through the radio from sensor nodes
- * and forwards a message to the network server node through the serialForwarder,(??? check if it works right!) 
- * it will the wait for the ack from network server and relay it to the  
- * right sensor node. 
+ * the networkNode receives through the radio from gateway nodes
+ * and forwards a message through the serial port,that is then 
+ * read by the nodeRED 
  * 
  *  @authors Matheus Fim and Caio Zuliani
  */
@@ -21,13 +20,11 @@ module networkNodeC {
         interface SplitControl as RadioControl;
 
     	interface AMSend as UartSend;
-// 	interface Receive as UartReceive[am_id_t id];
     	interface Packet as UartPacket;
 	interface AMPacket as UartAMPacket;
 
 	interface AMSend as RadioSend;
 	interface Receive as RadioReceive;
-//	interface Receive as RadioSnoop[AM_MY:_MSG];
 	interface Packet as RadioPacket;
 	interface AMPacket as RadioAMPacket;
 
@@ -63,34 +60,26 @@ module networkNodeC {
     if(err != SUCCESS) {
 	call RadioControl.start();
     }
-
   }
-  
+ 
   event void RadioControl.stopDone(error_t err){}
 
-
-//***************** SerialControl interface ********************//
+  //***************** SerialControl interface ********************//
   event void SerialControl.startDone(error_t err){
       
     if(err != SUCCESS) {
 	call SerialControl.start();
     }
-
   }
   
   event void SerialControl.stopDone(error_t err){}
 
-
   //***************** MilliTimer interface ********************//
- // change to be the ack!!!! not now.....
- event void MilliTimer.fired() {
+  event void MilliTimer.fired() {
 	post sendToUart();
   }
   
-
-
   //***************************** Radio Receive interface *****************//
-
   event message_t* RadioReceive.receive(message_t* buf,void* payload, uint8_t len) {
 	
 	uint8_t i;
@@ -98,7 +87,7 @@ module networkNodeC {
 	my_msg_t* mess=(my_msg_t*)payload;
 
 	my_ack_t* ack=(my_ack_t*)(call RadioPacket.getPayload(&ackPacket, sizeof (my_ack_t)));
-
+		
 	ack->code = mess->sender + mess->value + mess->msg_id;
 	call RadioSend.send(call RadioAMPacket.source(buf), &ackPacket, sizeof(my_ack_t));
          
@@ -118,24 +107,26 @@ module networkNodeC {
 	//printf("THE SENDER IS.... %u\n", call RadioAMPacket.source(buf));
 	//printfflush();	
 
-        // OK CHANGE THIS!!!!!!! NOT BROADCAST; BUT TO RIGHT NODE!
-	//call RadioSend.send(call RadioAMPacket.source(buf), &ackPacket, sizeof(my_ack_t));
-        
-	//post sendACK();
-	if(!uartBusy){
+        if(!uartBusy){
+	  printf("NETWORK NODE %u\n Message Received: %u\n\n : %u\n", TOS_NODE_ID, not_again[index].msg_id);
 	  post sendToUart();
 	  uartBusy= TRUE;
 	}
+	printf("NETWORK NODE %u\n ACK Sent (code: %u)\n\n : %u\n", TOS_NODE_ID, ack->code);
+
     return buf;
 
   }
 
   //********************* RadioSend interface ****************//
-  event void RadioSend.sendDone(message_t* buf,error_t err) {}
+  event void RadioSend.sendDone(message_t* buf,error_t err) {
+    /*if(err != SUCCESS){
+	post sendAck();
+    }*/
+  }
 
 
   //************************* Read interface **********************//
-
   task void sendToUart() {
 	
 	my_msg_t* mess=(my_msg_t*)(call RadioPacket.getPayload(&packet,sizeof(my_msg_t)));
@@ -143,7 +134,6 @@ module networkNodeC {
 	mess->value = not_again[index].value;
 	mess->sender = not_again[index].sender;
 		  
-	//call PacketAcknowledgements.requestAck( &packet );
 	call UartSend.send(AM_BROADCAST_ADDR,&packet,sizeof(my_msg_t));
 
   }

@@ -1,7 +1,18 @@
+/**
+ * PROJECT: LoraWAN-Like sensor Network
+ * 
+ * Source File for the implementation of gateway node in which
+ * the gateway receives a message from the sensor node
+ * and forwards it message to the network node, 
+ * the mote will then await for an ACK message and 
+ * relay it back to the sensor node 
+ * 
+ *  @authors Matheus Fim and Caio Zuliani
+ */
+
 #include "../LoraLikeConfig.h"
 #include "Timer.h"
 #include "printf.h"
-
 
 module gatewayNodeC {
 
@@ -30,8 +41,7 @@ module gatewayNodeC {
   task void sendData();
   task void sendAck();
 
-  //****************** Task send ack *****************//
-  
+  //****************** Task send ack *****************// 
   task void sendAck(){
 	my_ack_t* ack = (my_ack_t*)(call Packet.getPayload(&ackPacket,sizeof(my_ack_t)));
 
@@ -41,8 +51,7 @@ module gatewayNodeC {
 	
   }
   //****************** Task send response *****************//
-  
- task void sendData() {
+  task void sendData() {
 
 	my_msg_t* mess=(my_msg_t*)(call Packet.getPayload(&packet,sizeof(my_msg_t)));
 		
@@ -72,6 +81,8 @@ module gatewayNodeC {
 
   //***************** MilliTimer interface ********************//
   event void MilliTimer.fired() {
+	printf("GATEWAY NODE %u\n Message ACK **NOT** Received: %u\n ReSending msg\n\n : %u\n", TOS_NODE_ID, rec_id);
+    	printfflush(); 
 	post sendData();
   }
   
@@ -87,15 +98,16 @@ module gatewayNodeC {
     }
   }
 
- //********************* Receive ACK interface ****************//
+  //********************* Receive ACK interface ****************//
   event message_t* Receive2.receive(message_t* msg, void* payload, uint8_t len){
         
       my_ack_t *ack = (my_ack_t *) payload;      
-   
-      //printf("ACK->CODE : %u\n", ack->code);
-      //printfflush();
-	
+   	
       if(ack->code == sender + new_value + rec_id){ 
+	
+	printf("GATEWAY NODE %u\n ACK Received (code: %u)\n Timer Stoped\n Message Relayed\n\n : %u\n", TOS_NODE_ID, ack->code);
+  	printfflush();
+	
 	code = ack->code;
 	post sendAck();	
 	radioBusy= FALSE;		
@@ -105,19 +117,20 @@ module gatewayNodeC {
       return msg;
     
   }
- //********************* Receive MSG interface ****************//
+  //********************* Receive MSG interface ****************//
   event message_t* Receive1.receive(message_t* msg, void* payload, uint8_t len){
       
       if(!radioBusy){
+	
       	my_msg_t* mess = (my_msg_t*) payload;
         rec_id = mess ->msg_id;
       	new_value = mess ->value;   
         sender = mess->sender;    	
-      	//oldPacket = packet;
-
-	//printf("G THE SENDER IS.... %u\n", call AMPacket.source( &packet ));	
-
-  	post sendData();
+ 
+	printf("GATEWAY NODE %u\n Message Received: %u\n Start relay\n\n : %u\n", TOS_NODE_ID, rec_id);
+    	printfflush(); 
+ 
+ 	post sendData();
   	radioBusy = TRUE;
       }
 
@@ -125,8 +138,11 @@ module gatewayNodeC {
   }
 
   //********************* AckSend interface ****************//
-  event void AckSend.sendDone(message_t* buf,error_t err) {}
-	// IMPLEMENT SOMETHING!
+  event void AckSend.sendDone(message_t* buf,error_t err) {
+    if(err != SUCCESS){
+	post sendAck();
+    }
+  }
 
 }
 

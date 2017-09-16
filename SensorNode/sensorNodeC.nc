@@ -15,9 +15,6 @@
 #include "printf.h"
 
 
-// in the moment: reads fake sensor and broadcast every 30 seconds, ack message 
-// to implement:  turn off radio when not transmiting, ack message time window should be 1 second
-
 module sensorNodeC {
 
   uses {
@@ -44,14 +41,20 @@ module sensorNodeC {
   task void sendData();
   task void reSendData();
 
-   task void reSendData() {
-        
+  //****************** Task resend response *****************//    
+ task void reSendData() {
+     
 	my_msg_t* mess=(my_msg_t*)(call Packet.getPayload(&packet,sizeof(my_msg_t)));
-		
+	
+	// data of the previous message, if it has been overwritten, the data is lost 
+	// there is a 30 seconds window. That is: 29 tries.	
 	mess->msg_id = rec_id;
 	mess->value = new_value;
 	mess->sender = sender;
 
+	printf("SENSOR NODE %u\n Message ACK **NOT** Received: %u\n ReSending msg\n\n : %u\n", TOS_NODE_ID, rec_id);
+    	printfflush();
+ 
 	call AMSend.send(AM_BROADCAST_ADDR, &packet, sizeof(my_msg_t));
   }
   //****************** Task send response *****************// 
@@ -59,10 +62,10 @@ module sensorNodeC {
 	call Read.read();
   }
 
-//************************* Read interface **********************//
+  //************************* Read interface **********************//
    
-event void Read.readDone(error_t result, uint16_t data) {
-
+  event void Read.readDone(error_t result, uint16_t data) {
+	
 	my_msg_t* mess=(my_msg_t*)(call Packet.getPayload(&packet,sizeof(my_msg_t)));
 	mess->msg_id = counter++;
 	mess->value = data;
@@ -85,6 +88,7 @@ event void Read.readDone(error_t result, uint16_t data) {
   event void SplitControl.startDone(error_t err){
       
     if(err == SUCCESS) {
+	// 30 seconds timer 
 	call MilliTimer.startPeriodic(30000);	
     }
     else{
@@ -97,34 +101,40 @@ event void Read.readDone(error_t result, uint16_t data) {
 
   //***************** MilliTimer interface ********************//
   event void MilliTimer.fired() {
+	// this timer controls the 30 seconds readings
 	post sendData();
   }
   
 
   //***************** AckTimer interface ********************//
   event void AckTimer.fired() {
+	// this timer controls the 1 second time window to resend msg
 	post reSendData();
   }
 
   //********************* AMSend interface ****************//
   event void AMSend.sendDone(message_t* buf,error_t err) {
 
+    printf("SENSOR NODE %u\n Message Sent: %u\n Start 1 sec Timer\n\n : %u\n", TOS_NODE_ID, rec_id);
+    printfflush();    
+
     if(&packet == buf && err == SUCCESS ) {
-	call AckTimer.startOneShot(1000);	
+       // start the 1 second window 
+       call AckTimer.startOneShot(1000);	
     }
     else{
-        post sendData();
+       post sendData();
     }
   }
 
  //********************* Receive ACK interface ****************//
   event message_t* Receive.receive(message_t* msg, void* payload, uint8_t len){
-        
+      // receive the ack and check if the code is write  	 
       my_ack_t *ack = (my_ack_t *) payload;      
       
-     // printf("ACK->CODE : %u\n", ack->code);
-      //printfflush();    
-
+      printf("SENSOR NODE %u\n ACK Received (code: %u)\n Timer Stoped\n\n : %u\n", TOS_NODE_ID, ack->code);
+      printfflush();  
+      
       if(ack->code == sender + new_value + rec_id){ 		
 	call AckTimer.stop(); 
       }	

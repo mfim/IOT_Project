@@ -5,7 +5,7 @@
 configuration gatewayNodeAppC {}
 
 implementation {
-
+  // we make use of two AM Type to differentiate the message from the ack 
   components MainC, gatewayNodeC as App;
   components new AMSenderC(AM_MY_MSG) as MsgSender;
   components new AMSenderC(AM_MY_ACK) as AckSender;
