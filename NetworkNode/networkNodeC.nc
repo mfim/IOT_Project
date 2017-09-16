@@ -92,12 +92,16 @@ module networkNodeC {
   //***************************** Radio Receive interface *****************//
 
   event message_t* RadioReceive.receive(message_t* buf,void* payload, uint8_t len) {
-
+	
+	uint8_t i;
+			
 	my_msg_t* mess=(my_msg_t*)payload;
 
 	my_ack_t* ack=(my_ack_t*)(call RadioPacket.getPayload(&ackPacket, sizeof (my_ack_t)));
-        
-	uint8_t i;
+
+	ack->code = mess->sender + mess->value + mess->msg_id;
+	call RadioSend.send(call RadioAMPacket.source(buf), &ackPacket, sizeof(my_ack_t));
+         
 	for(i = 0; i < CAPACITY; i++){
 		if((not_again[i].msg_id == mess->msg_id) && (not_again[i].sender == mess->sender)){
 			return buf;
@@ -111,16 +115,11 @@ module networkNodeC {
         not_again[index].sender = mess->sender;  
 	
 	//printf("Not Again: Id: %u Value: %u Sender: %u\n", not_again[index].msg_id, not_again[index].value, not_again[index].sender);	
-
-	//printfflush();	
-
-	ack->code = not_again[index].sender + not_again[index].value + not_again[index].msg_id;
-	
-	//printf("THE SENDER IS.... %u\n", call RadioAMPacket.source( &packet ));
+	//printf("THE SENDER IS.... %u\n", call RadioAMPacket.source(buf));
 	//printfflush();	
 
         // OK CHANGE THIS!!!!!!! NOT BROADCAST; BUT TO RIGHT NODE!
-	call RadioSend.send(AM_BROADCAST_ADDR, &ackPacket, sizeof(my_ack_t));
+	//call RadioSend.send(call RadioAMPacket.source(buf), &ackPacket, sizeof(my_ack_t));
         
 	//post sendACK();
 	if(!uartBusy){
