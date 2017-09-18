@@ -103,17 +103,15 @@ module networkNodeC {
 	not_again[index].value = mess->value;
         not_again[index].sender = mess->sender;  
 	
-	//printf("Not Again: Id: %u Value: %u Sender: %u\n", not_again[index].msg_id, not_again[index].value, not_again[index].sender);	
-	//printf("THE SENDER IS.... %u\n", call RadioAMPacket.source(buf));
+	//printf("NETWORK NODE %u ACK Sent (code: %u)\n", TOS_NODE_ID, ack->code);	
 	//printfflush();	
 
         if(!uartBusy){
-	  printf("NETWORK NODE %u\n Message Received: %u\n\n : %u\n", TOS_NODE_ID, not_again[index].msg_id);
+	  //printf("NETWORK NODE %u Message Received: %u\n", TOS_NODE_ID, not_again[index].msg_id);
+	  //printfflush();
 	  post sendToUart();
 	  uartBusy= TRUE;
 	}
-	printf("NETWORK NODE %u\n ACK Sent (code: %u)\n\n : %u\n", TOS_NODE_ID, ack->code);
-
     return buf;
 
   }

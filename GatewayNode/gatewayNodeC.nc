@@ -81,7 +81,7 @@ module gatewayNodeC {
 
   //***************** MilliTimer interface ********************//
   event void MilliTimer.fired() {
-	printf("GATEWAY NODE %u\n Message ACK **NOT** Received: %u\n ReSending msg\n\n : %u\n", TOS_NODE_ID, rec_id);
+	printf("GATEWAY NODE %u Message ACK **NOT** Received: %u\n", TOS_NODE_ID, rec_id);
     	printfflush(); 
 	post sendData();
   }
@@ -105,7 +105,7 @@ module gatewayNodeC {
    	
       if(ack->code == sender + new_value + rec_id){ 
 	
-	printf("GATEWAY NODE %u\n ACK Received (code: %u)\n Timer Stoped\n Message Relayed\n\n : %u\n", TOS_NODE_ID, ack->code);
+	printf("GATEWAY NODE %u ACK Received (code: %u)\n", TOS_NODE_ID, ack->code);
   	printfflush();
 	
 	code = ack->code;
@@ -127,7 +127,7 @@ module gatewayNodeC {
       	new_value = mess ->value;   
         sender = mess->sender;    	
  
-	printf("GATEWAY NODE %u\n Message Received: %u\n Start relay\n\n : %u\n", TOS_NODE_ID, rec_id);
+	printf("GATEWAY NODE %u Message Received: %u\n", TOS_NODE_ID, rec_id);
     	printfflush(); 
  
  	post sendData();

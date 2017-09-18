@@ -52,8 +52,8 @@ module sensorNodeC {
 	mess->value = new_value;
 	mess->sender = sender;
 
-	printf("SENSOR NODE %u\n Message ACK **NOT** Received: %u\n ReSending msg\n\n : %u\n", TOS_NODE_ID, rec_id);
-    	printfflush();
+	//printf("SENSOR NODE %u Message ACK **NOT** Received: %u\n", TOS_NODE_ID, rec_id);
+    	//printfflush();
  
 	call AMSend.send(AM_BROADCAST_ADDR, &packet, sizeof(my_msg_t));
   }
@@ -115,8 +115,8 @@ module sensorNodeC {
   //********************* AMSend interface ****************//
   event void AMSend.sendDone(message_t* buf,error_t err) {
 
-    printf("SENSOR NODE %u\n Message Sent: %u\n Start 1 sec Timer\n\n : %u\n", TOS_NODE_ID, rec_id);
-    printfflush();    
+    //printf("SENSOR NODE %u Message Sent: %u\n", TOS_NODE_ID, rec_id);
+    //printfflush();    
 
     if(&packet == buf && err == SUCCESS ) {
        // start the 1 second window 
@@ -132,8 +132,8 @@ module sensorNodeC {
       // receive the ack and check if the code is write  	 
       my_ack_t *ack = (my_ack_t *) payload;      
       
-      printf("SENSOR NODE %u\n ACK Received (code: %u)\n Timer Stoped\n\n : %u\n", TOS_NODE_ID, ack->code);
-      printfflush();  
+      //printf("SENSOR NODE %u ACK Received (code: %u)\n", TOS_NODE_ID, ack->code);
+      //printfflush();  
       
       if(ack->code == sender + new_value + rec_id){ 		
 	call AckTimer.stop(); 
